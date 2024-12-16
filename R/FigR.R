@@ -26,6 +26,7 @@ runFigRGRN <- function(ATAC.se, # SE of scATAC peak counts. Needed for chromVAR 
                        dorcTab, # peak x DORC connections (should contain indices relative to peaks in ATAC.se)
                        n_bg=50, # No. of background peaks to use for motif enrichment Z test
                        genome, # One of mm10, hg19, hg38, with no default
+                       pwm, # a PFMatrixList object (TFBSTools) with motif pfms 
                        dorcMat, # Expect smoothed
                        rnaMat, # Expect smoothed
                        dorcGenes=NULL, # If only running on a subset of genes
@@ -82,14 +83,14 @@ runFigRGRN <- function(ATAC.se, # SE of scATAC peak counts. Needed for chromVAR 
   }
 
   # Set data subfolder path
-  packagePath <- find.package("FigR", lib.loc=NULL, quiet = TRUE)
-
-  if(grepl("hg",genome)){
-    pwm <- readRDS(paste0(packagePath,"/data/cisBP_human_pfms_2021.rds"))
-  } else {
-    pwm <- readRDS(paste0(packagePath,"/data/cisBP_mouse_pfms_2021.rds"))
-  }
-
+  # packagePath <- find.package("FigR", lib.loc=NULL, quiet = TRUE)
+  # 
+  # if(grepl("hg",genome)){
+  #   pwm <- readRDS(paste0(packagePath,"/data/cisBP_human_pfms_2021.rds"))
+  # } else {
+  #   pwm <- readRDS(paste0(packagePath,"/data/cisBP_mouse_pfms_2021.rds"))
+  # }
+  
   # Old motif naming convention
   if(all(grepl("_",names(pwm),fixed = TRUE)))
      names(pwm) <- FigR::extractTFNames(names(pwm))
@@ -101,10 +102,11 @@ runFigRGRN <- function(ATAC.se, # SE of scATAC peak counts. Needed for chromVAR 
 
   # Only non-zero expression TFs (also found in rnaMat)
   motifsToKeep <- intersect(names(pwm),myGeneNames)
-
+  
   # This has to be done on the full SE (same peakset used as input to dorc calling)
   cat("Getting peak x motif matches ..\n")
-  motif_ix <- motifmatchr::matchMotifs(subject = ATAC.se,pwms = pwm[motifsToKeep],genome=genome)
+  motif_ix <- motifmatchr::matchMotifs(subject = ATAC.se,pwms = pwm[names(pwm) %in% motifsToKeep],
+                                       genome=genome)
 
   # Keep TFs with some peak x motif match
   motif_ix <- motif_ix[,Matrix::colSums(assay(motif_ix))!=0]
@@ -149,7 +151,7 @@ runFigRGRN <- function(ATAC.se, # SE of scATAC peak counts. Needed for chromVAR 
 
                            mZ <- FigR::motifPeakZtest(peakSet = DORCNNpeaks,
                                                 bgPeaks = bg,
-                                                tfMat = assay(motif_ix))
+                                                tfMat = SummarizedExperiment::assay(motif_ix))
 
                            mZ <- mZ[,c("gene","z_test")]
                            colnames(mZ)[1] <- "Motif"
@@ -178,7 +180,9 @@ runFigRGRN <- function(ATAC.se, # SE of scATAC peak counts. Needed for chromVAR 
   # Here, we only sign by corr
   # Since sometimes we lose digit precision (1 - v small number is 1, instead of 0.9999999..)
   # Use Rmpfr, increase precision limits above default (100 here)
-  TFenrich.d <- TFenrich.d %>% dplyr::mutate("Score"=sign(Corr)*as.numeric(-log10(1-(1-Rmpfr::mpfr(Enrichment.P,100))*(1-Rmpfr::mpfr(Corr.P,100)))))
+  #TFenrich.d <- TFenrich.d %>% dplyr::mutate("Score"=sign(Corr)*as.numeric(-log10(1-(1-Rmpfr::mpfr(Enrichment.P,100))*(1-Rmpfr::mpfr(Corr.P,100)))))
+  TFenrich.d <- TFenrich.d %>% dplyr::mutate("Score"=sign(Corr)*as.numeric(-log10(1-(1-Enrichment.P)*(1-Corr.P))))
+  
   TFenrich.d$Score[TFenrich.d$Enrichment.Z < 0] <- 0
   TFenrich.d
 }

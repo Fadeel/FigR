@@ -257,7 +257,7 @@ motifPeakZtest <- function(peakSet,
   cat("Calculating empirical p values and z score p values ..\n")
 
   # loop over each motif and generate enrichment statistics compared to background
-  m.p <- dplyr::bind_rows(lapply(names(p.tab), function(motif) {
+  m.p <- dplyr::bind_rows(lapply(seq(length(p.tab)), function(motif) {
 
     # calculate sd and mean frequencies for bg and selected peaks
     s <- sd(bg.tab[motif, ])
@@ -270,8 +270,8 @@ motifPeakZtest <- function(peakSet,
 
     # generate data.frame object of relevant statistics
     d <- data.frame(
-      motifID = motif,
-      gene = extractTFNames(motif),
+      motifID = names(p.tab)[motif],
+      gene = extractTFNames(names(p.tab)[motif]),
       motif_obs_freq = p.tab[motif],
       motif_bg_freq = mean(bg.tab[motif, ]),
       motif_counts = p.tab[motif] * length(peakSet),
@@ -286,9 +286,13 @@ motifPeakZtest <- function(peakSet,
   # sort by enrichment pval, motif observed frequency
   # Note: this returned an error saying pval.z not found in the arrange, look into it
   #m.p <- dplyr::arrange(m.p,pval.z, motif_obs_freq)
-
+  
+  ## For each TF, pick motif with the highest enrichment
+  m.p2 = m.p %>% dplyr::group_by(gene) %>% dplyr::summarise(pval.z = min(pval.z), 
+                                                            z_test =z_test[pval.z == min(pval.z)][1])
+  
   # return df of enrichment scores
-  return(m.p)
+  return(m.p2)
 }
 
 #' Plot marker scores on single cell scatter plots
