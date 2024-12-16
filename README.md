@@ -1,4 +1,9 @@
 # Functional Inference of Gene Regulation (FigR)
+------------------------------
+FigR code was updated to do the following,
+1) accept any collection of motifs (formated as PFMatrixList, from TFBSTools package)
+2) one TF can have multiple motifs. For each DORC, pick TF motif with the highest enrichment to be associated with this TF
+------------------------------
 
 FigR is a computational framework for supporting the integration of single cell chromatin accessibility and gene expression data to infer transcriptional regulators of target genes
 
